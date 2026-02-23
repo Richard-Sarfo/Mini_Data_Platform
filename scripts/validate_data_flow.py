@@ -73,7 +73,7 @@ def check_postgres_schema():
     return True
 
 def check_minio():
-    
+
     client = Minio(
         os.getenv("MINIO_ENDPOINT", "localhost:9000"),
         access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
@@ -83,3 +83,14 @@ def check_minio():
     buckets = {b.name for b in client.list_buckets()}
     assert "sales-data" in buckets, f"Missing 'sales-data' bucket. Found: {buckets}"
     return True
+
+
+def check_airflow():
+    url = os.getenv("AIRFLOW_URL", "http://localhost:8080/health")
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return data.get("status") == "healthy"
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Airflow unreachable: {e}")
