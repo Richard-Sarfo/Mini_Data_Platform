@@ -1,0 +1,31 @@
+# Docker volumes
+airflow/logs/
+airflow/plugins/
+data/sample/
+data/processed/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+*.env
+.env.*
+!.env.example
+
+# Generated data
+*.csv
+!data/.gitkeep
