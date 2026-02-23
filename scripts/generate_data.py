@@ -130,3 +130,31 @@ def upload_to_minio(filepath: str, bucket: str = "sales-data"):
     object_name = f"incoming/{filename}"
     client.fput_object(bucket, object_name, filepath)
     print(f"Uploaded {filename} → minio://{bucket}/{object_name}")
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate fake sales data")
+    parser.add_argument("--rows", type=int, default=500, help="Rows per file")
+    parser.add_argument("--files", type=int, default=3, help="Number of files")
+    parser.add_argument("--upload", action="store_true", help="Upload to MinIO")
+    parser.add_argument("--output-dir", default="./data/sample", help="Output directory")
+    args = parser.parse_args()
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    for i in range(1, args.files + 1):
+        filename = f"sales_batch_{timestamp}_{i:02d}.csv"
+        filepath = os.path.join(args.output_dir, filename)
+        generate_csv(filepath, args.rows)
+
+        if args.upload:
+            upload_to_minio(filepath)
+
+    print(f"\nDone! Generated {args.files} file(s) with {args.rows} rows each.")
+    if not args.upload:
+        print("Tip: Add --upload to push files directly to MinIO")
+
+
+if __name__ == "__main__":
+    main()
