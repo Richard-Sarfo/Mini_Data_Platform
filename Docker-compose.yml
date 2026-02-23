@@ -53,3 +53,121 @@ services:
       retries: 5
       start_period: 5s
     restart: unless-stopped
+  minio:
+    image: minio/minio:latest
+    container_name: mini-dp-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  # MinIO bucket setup
+  minio-init:
+    image: minio/mc:latest
+    container_name: mini-dp-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin123;
+      mc mb --ignore-existing local/sales-data;
+      mc mb --ignore-existing local/processed-data;
+      mc mb --ignore-existing local/archive;
+      echo 'MinIO buckets created';
+      "
+    restart: on-failure
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: mini-dp-airflow-web
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: mini-dp-airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: mini-dp-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /sources/logs /sources/dags /sources/plugins
+        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    user: "0:0"
+    volumes:
+      - ./airflow/logs:/sources/logs
+      - ./airflow/dags:/sources/dags
+      - ./airflow/plugins:/sources/plugins
+  metabase:
+    image: metabase/metabase:latest
+    container_name: mini-dp-metabase
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: airflow
+      MB_DB_PASS: airflow
+      MB_DB_HOST: postgres
+    volumes:
+      - metabase_data:/metabase-data
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+  metabase_data:
+
+networks:
+  default:
+    name: mini-data-platform
