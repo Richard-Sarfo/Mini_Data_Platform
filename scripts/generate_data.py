@@ -7,7 +7,6 @@ Usage: python generate_data.py [--rows 1000] [--files 3] [--upload]
 
 import csv
 import random
-from tracemalloc import start
 import uuid
 import argparse
 import os
@@ -60,6 +59,7 @@ CUSTOMERS = [
 PAYMENT_METHODS = ["Credit Card", "Debit Card", "PayPal", "Bank Transfer", "Corporate Account"]
 ORDER_STATUSES = ["Completed", "Completed", "Completed", "Pending", "Refunded"]
 
+
 def random_date(start_days_ago=365, end_days_ago=0):
     """Generate a random datetime between `start` and `end`"""
     start = datetime.now() - timedelta(days=start_days_ago)
@@ -67,3 +67,31 @@ def random_date(start_days_ago=365, end_days_ago=0):
     delta = end - start
     random_days = random.randint(0, delta.days)
     return (start + timedelta(days=random_days)).date()
+
+
+def generate_transaction():
+    """Generate a single sales transaction record."""
+    product = random.choice(PRODUCTS)
+    customer = random.choice(CUSTOMERS)
+    quantity = random.randint(1, 10)
+    unit_price = product[3]
+    discount = round(random.choice([0, 0, 0, 5, 10, 15, 20]) * unit_price / 100, 2)
+    total = round((unit_price * quantity) - discount, 2)
+
+    return {
+        "transaction_id": f"TXN-{uuid.uuid4().hex[:12].upper()}",
+        "transaction_date": random_date(),
+        "customer_id": customer[0],
+        "customer_name": customer[1],
+        "customer_email": customer[2],
+        "customer_region": customer[3],
+        "product_id": product[0],
+        "product_name": product[1],
+        "product_category": product[2],
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "total_amount": total,
+        "discount": discount,
+        "payment_method": random.choice(PAYMENT_METHODS),
+        "order_status": random.choice(ORDER_STATUSES),
+    }
