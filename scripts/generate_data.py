@@ -7,6 +7,7 @@ Usage: python generate_data.py [--rows 1000] [--files 3] [--upload]
 
 import csv
 import random
+from tracemalloc import start
 import uuid
 import argparse
 import os
@@ -19,7 +20,7 @@ try:
     MINIO_AVAILABLE = True
 except ImportError:
     MINIO_AVAILABLE = False
-    
+
 PRODUCTS = [
     ("P001", "Laptop Pro 15", "Electronics", 1299.99),
     ("P002", "Wireless Mouse", "Electronics", 29.99),
@@ -55,3 +56,14 @@ CUSTOMERS = [
     ("C014", "Noah Jackson", "noah@data.net", "South"),
     ("C015", "Olivia Taylor", "olivia@analytics.org", "East"),
 ]
+
+PAYMENT_METHODS = ["Credit Card", "Debit Card", "PayPal", "Bank Transfer", "Corporate Account"]
+ORDER_STATUSES = ["Completed", "Completed", "Completed", "Pending", "Refunded"]
+
+def random_date(start_days_ago=365, end_days_ago=0):
+    """Generate a random datetime between `start` and `end`"""
+    start = datetime.now() - timedelta(days=start_days_ago)
+    end = datetime.now() - timedelta(days=end_days_ago)
+    delta = end - start
+    random_days = random.randint(0, delta.days)
+    return (start + timedelta(days=random_days)).date()
