@@ -95,3 +95,17 @@ def generate_transaction():
         "payment_method": random.choice(PAYMENT_METHODS),
         "order_status": random.choice(ORDER_STATUSES),
     }
+
+def generate_csv(filepath: str, num_rows: int = 500):
+    """Generate a CSV file with fake sales data."""
+    Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = list(generate_transaction().keys())
+
+    with open(filepath, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for _ in range(num_rows):
+            writer.writerow(generate_transaction())
+
+    print(f"Generated {num_rows} rows → {filepath}")
+    return filepath
