@@ -94,3 +94,13 @@ def check_airflow():
             return data.get("status") == "healthy"
     except urllib.error.URLError as e:
         raise RuntimeError(f"Airflow unreachable: {e}")
+
+def check_metabase():
+
+    url = os.getenv("METABASE_URL", "http://localhost:3000/api/health")
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return data.get("status") == "ok"
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Metabase unreachable: {e}")
