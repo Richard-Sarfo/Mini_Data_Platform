@@ -109,3 +109,24 @@ def generate_csv(filepath: str, num_rows: int = 500):
 
     print(f"Generated {num_rows} rows → {filepath}")
     return filepath
+
+def upload_to_minio(filepath: str, bucket: str = "sales-data"):
+    """Upload a CSV file to MinIO."""
+    if not MINIO_AVAILABLE:
+        print("minio package not installed. Skipping upload.")
+        return
+
+    endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
+
+    client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=False)
+
+    # Ensure bucket exists
+    if not client.bucket_exists(bucket):
+        client.make_bucket(bucket)
+
+    filename = Path(filepath).name
+    object_name = f"incoming/{filename}"
+    client.fput_object(bucket, object_name, filepath)
+    print(f"Uploaded {filename} → minio://{bucket}/{object_name}")
