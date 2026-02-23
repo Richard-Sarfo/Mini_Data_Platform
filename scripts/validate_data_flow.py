@@ -39,7 +39,7 @@ def check(name: str, fn):
         return False
 
 def check_postgres():
-    
+
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
         port=int(os.getenv("DATA_DB_PORT", 5432)),
@@ -49,4 +49,25 @@ def check_postgres():
         connect_timeout=5,
     )
     conn.close()
+    return True
+
+def check_postgres_schema():
+    
+    conn = psycopg2.connect(
+        host=os.getenv("DATA_DB_HOST", "localhost"),
+        port=int(os.getenv("DATA_DB_PORT", 5432)),
+        dbname=os.getenv("DATA_DB_NAME", "salesdb"),
+        user=os.getenv("DATA_DB_USER", "datauser"),
+        password=os.getenv("DATA_DB_PASSWORD", "datapassword"),
+    )
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_name IN ('sales_transactions', 'pipeline_runs')
+        """)
+        tables = {r[0] for r in cur.fetchall()}
+    conn.close()
+    assert "sales_transactions" in tables, "Missing sales_transactions table"
+    assert "pipeline_runs" in tables, "Missing pipeline_runs table"
     return True
