@@ -52,7 +52,7 @@ def check_postgres():
     return True
 
 def check_postgres_schema():
-    
+
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
         port=int(os.getenv("DATA_DB_PORT", 5432)),
@@ -70,4 +70,16 @@ def check_postgres_schema():
     conn.close()
     assert "sales_transactions" in tables, "Missing sales_transactions table"
     assert "pipeline_runs" in tables, "Missing pipeline_runs table"
+    return True
+
+def check_minio():
+    
+    client = Minio(
+        os.getenv("MINIO_ENDPOINT", "localhost:9000"),
+        access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
+        secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
+        secure=False,
+    )
+    buckets = {b.name for b in client.list_buckets()}
+    assert "sales-data" in buckets, f"Missing 'sales-data' bucket. Found: {buckets}"
     return True
