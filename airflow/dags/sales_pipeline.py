@@ -165,4 +165,19 @@ def process_and_load_files(**context):
                         log.error(f"Row error: {row_err}")
                         failed += 1
 
+                # Log pipeline run
+                cur.execute("""
+                    INSERT INTO pipeline_runs
+                        (run_id, dag_id, file_processed, records_ingested, records_failed, status, started_at, completed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    context["run_id"], context["dag"].dag_id, object_name,
+                    inserted, failed, "success",
+                    context["data_interval_start"], datetime.now(),
+                ))
+
+                conn.commit()
+                log.info(f"Loaded {inserted} rows, {failed} failed from {object_name}")
+                total_inserted += inserted
+                total_failed += failed
                 
