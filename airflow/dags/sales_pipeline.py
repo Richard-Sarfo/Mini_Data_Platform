@@ -55,3 +55,33 @@ EXPECTED_COLUMNS = [
     "product_category", "quantity", "unit_price", "total_amount",
     "discount", "payment_method", "order_status",
 ]
+
+def get_minio_client() -> Minio:
+    return Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY,
+                 secret_key=MINIO_SECRET_KEY, secure=False)
+
+
+def get_db_connection():
+    return psycopg2.connect(**DB_CONFIG)
+
+
+def check_for_new_files(**context):
+    """Scan MinIO 'incoming/' prefix for CSV files to process."""
+    client = get_minio_client()
+    
+    try:
+        objects = list(client.list_objects(SOURCE_BUCKET, prefix="incoming/", recursive=True))
+    except S3Error as e:
+        log.warning(f"MinIO error: {e}")
+        objects = []
+
+    csv_files = [obj.object_name for obj in objects if obj.object_name.endswith(".csv")]
+
+    if not csv_files:
+        log.info("No new CSV files found in MinIO.")
+    else:
+        log.info(f"Found {len(csv_files)} file(s): {csv_files}")
+
+    context["ti"].xcom_push(key="files_to_process", value=csv_files)
+    return csv_files
+
