@@ -102,3 +102,40 @@ def process_and_load_files(**context):
     total_failed = 0
     files_processed = 0
 
+
+    for object_name in files:
+        log.info(f"Processing: {object_name}")
+
+        try:
+            # Download from MinIO
+            response = client.get_object(SOURCE_BUCKET, object_name)
+            csv_data = response.read().decode("utf-8")
+            response.close()
+            
+            #load into dataframe
+            df = pd.read_csv(io.BytesIO(csv_data.encode("utf-8")))
+
+            # Validation 
+            missing_cols = [c for c in EXPECTED_COLUMNS if c not in df.columns]
+            if missing_cols:
+                log.warning(f"Missing columns in {object_name}: {missing_cols}")
+                continue  # Skip processing this file if missing expected columns
+            original_count = len(df)
+
+            # Data Cleaning
+            
+            df = df.dropna(subset=["transaction_id", "transaction_date"])
+            df = df.drop_duplicates(subset=["transaction_id"])
+            df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce").dt.date
+            df = df.dropna(subset=["transaction_date"])
+            df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(1).astype(int)
+            df["unit_price"] = pd.to_numeric(df["unit_price"], errors="coerce").fillna(0)
+            df["total_amount"] = pd.to_numeric(df["total_amount"], errors="coerce").fillna(0)
+            df["discount"] = pd.to_numeric(df["discount"], errors="coerce").fillna(0)
+            df["customer_name"] = df["customer_name"].str.strip().str.title()
+            df["product_category"] = df["product_category"].str.strip().str.title()
+            df["order_status"] = df["order_status"].str.strip().str.title()
+
+            cleaned_count = len(df)
+            dropped = original_count - cleaned_count
+            log.info(f"{object_name}: {original_count} rows → {cleaned_count} after cleaning ({dropped} dropped)")
