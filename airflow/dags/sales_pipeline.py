@@ -180,4 +180,27 @@ def process_and_load_files(**context):
                 log.info(f"Loaded {inserted} rows, {failed} failed from {object_name}")
                 total_inserted += inserted
                 total_failed += failed
-                
+
+                # Archive processed file 
+            archive_name = object_name.replace("incoming/", "processed/")
+            csv_bytes = csv_data
+            client.put_object(ARCHIVE_BUCKET, archive_name,
+                              io.BytesIO(csv_bytes), len(csv_bytes),
+                              content_type="text/csv")
+            client.remove_object(SOURCE_BUCKET, object_name)
+            log.info(f"Archived {object_name} → {ARCHIVE_BUCKET}/{archive_name}")
+            files_processed += 1
+
+        except Exception as e:
+            log.error(f"Failed to process {object_name}: {e}")
+            conn.rollback()
+
+    conn.close()
+
+    summary = {
+        "files_processed": files_processed,
+        "total_records": total_inserted,
+        "total_failed": total_failed,
+    }
+    ti.xcom_push(key="processing_summary", value=summary)
+    return summary
