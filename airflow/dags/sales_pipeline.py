@@ -123,7 +123,7 @@ def process_and_load_files(**context):
             original_count = len(df)
 
             # Data Cleaning
-            
+
             df = df.dropna(subset=["transaction_id", "transaction_date"])
             df = df.drop_duplicates(subset=["transaction_id"])
             df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce").dt.date
@@ -139,3 +139,30 @@ def process_and_load_files(**context):
             cleaned_count = len(df)
             dropped = original_count - cleaned_count
             log.info(f"{object_name}: {original_count} rows → {cleaned_count} after cleaning ({dropped} dropped)")
+
+            # Load into PostgreSQL
+            insert_sql = """
+                INSERT INTO sales_transactions (
+                    transaction_id, transaction_date, customer_id, customer_name,
+                    customer_email, customer_region, product_id, product_name, product_category,
+                    quantity, unit_price, total_amount, discount, payment_method, order_status  
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            inserted = 0
+            failed = 0
+            with conn.cursor() as cur:
+                for _, row in df.iterrows():
+                    try:
+                        cur.execute(insert_sql, (
+                            row["transaction_id"], row["transaction_date"], row["customer_id"],
+                            row["customer_name"], row["customer_email"], row["customer_region"],
+                            row["product_id"], row["product_name"], row["product_category"],
+                            row["quantity"], row["unit_price"], row["total_amount"],
+                            row["discount"], row["payment_method"], row["order_status"]
+                        ))
+                        inserted += 1
+                    except Exception as row_err:
+                        log.error(f"Row error: {row_err}")
+                        failed += 1
+
+                
