@@ -85,3 +85,20 @@ def check_for_new_files(**context):
     context["ti"].xcom_push(key="files_to_process", value=csv_files)
     return csv_files
 
+
+def process_and_load_files(**context):
+    """Download, clean, validate, and load each CSV file into PostgreSQL."""
+    ti = context["ti"]
+    files = ti.xcom_pull(key="files_to_process", task_ids="check_for_new_files")
+
+    if not files:
+        log.info("No files to process.")
+        return {"processed": 0, "total_records": 0}
+
+    client = get_minio_client()
+    conn = get_db_connection()
+
+    total_inserted = 0
+    total_failed = 0
+    files_processed = 0
+
