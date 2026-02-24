@@ -137,3 +137,42 @@ def check_end_to_end_data_flow():
     # Note: Full end-to-end requires Airflow to run DAG.
     # This check validates the upload succeeded.
     return True
+
+def main():
+    log.info("=" * 55)
+    log.info("  MINI DATA PLATFORM — DATA FLOW VALIDATION")
+    log.info("=" * 55)
+
+    check("PostgreSQL connectivity", check_postgres)
+    check("PostgreSQL schema integrity", check_postgres_schema)
+    check("MinIO connectivity & buckets", check_minio)
+    check("Airflow health endpoint", check_airflow)
+    check("Metabase health endpoint", check_metabase)
+    check("End-to-end upload test", check_end_to_end_data_flow)
+
+    log.info("\n" + "=" * 55)
+    log.info("RESULTS SUMMARY")
+    log.info("=" * 55)
+
+    passed = sum(1 for _, status, _ in RESULTS if status == "PASS")
+    failed = sum(1 for _, status, _ in RESULTS if status == "FAIL")
+
+    for name, status, error in RESULTS:
+        icon = "✅" if status == "PASS" else "❌"
+        line = f"  {icon} {name}"
+        if error:
+            line += f"  →  {error}"
+        log.info(line)
+
+    log.info(f"\n  Passed: {passed}/{len(RESULTS)}")
+
+    if failed > 0:
+        log.error(f"\n{failed} check(s) FAILED. Platform not healthy.")
+        sys.exit(1)
+    else:
+        log.info("\nAll checks passed! Platform is healthy.")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
