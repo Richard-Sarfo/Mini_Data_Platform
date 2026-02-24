@@ -218,3 +218,20 @@ def refresh_materialized_views(**context):
         conn.rollback()
     finally:
         conn.close()
+
+def log_pipeline_summary(**context):
+    """Log final pipeline execution summary."""
+    ti = context["ti"]
+    summary = ti.xcom_pull(key="processing_summary", task_ids="process_and_load")
+    files = ti.xcom_pull(key="files_to_process", task_ids="check_for_new_files")
+
+    log.info("=" * 50)
+    log.info("PIPELINE EXECUTION SUMMARY")
+    log.info("=" * 50)
+    log.info(f"Run ID:           {context['run_id']}")
+    log.info(f"Execution Date:   {context['data_interval_start']}")
+    log.info(f"Files Found:      {len(files) if files else 0}")
+    log.info(f"Files Processed:  {summary.get('files_processed', 0) if summary else 0}")
+    log.info(f"Records Loaded:   {summary.get('total_records', 0) if summary else 0}")
+    log.info(f"Records Failed:   {summary.get('total_failed', 0) if summary else 0}")
+    log.info("=" * 50)
