@@ -204,3 +204,17 @@ def process_and_load_files(**context):
     }
     ti.xcom_push(key="processing_summary", value=summary)
     return summary
+
+def refresh_materialized_views(**context):
+    """Refresh PostgreSQL materialized views for Metabase dashboards."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("REFRESH MATERIALIZED VIEW daily_sales_summary;")
+            conn.commit()
+            log.info("Refreshed daily_sales_summary materialized view")
+    except Exception as e:
+        log.error(f"Failed to refresh views: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
