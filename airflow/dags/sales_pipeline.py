@@ -270,4 +270,7 @@ with DAG(
 
     end = EmptyOperator(task_id="end")
 
+    # Define task dependencies
+    start >> check_files >> process_load >> refresh_views >> log_summary >> end
+
     
