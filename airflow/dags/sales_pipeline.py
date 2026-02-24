@@ -235,3 +235,39 @@ def log_pipeline_summary(**context):
     log.info(f"Records Loaded:   {summary.get('total_records', 0) if summary else 0}")
     log.info(f"Records Failed:   {summary.get('total_failed', 0) if summary else 0}")
     log.info("=" * 50)
+
+
+# Define the DAG
+with DAG(
+    dag_id="sales_data_pipeline",
+    description="ETL pipeline: MinIO → PostgreSQL → Metabase",
+    default_args=DEFAULT_ARGS,
+    start_date=days_ago(1),
+    schedule_interval="@hourly",
+    catchup=False,
+    tags=["sales", "etl", "production"],
+    doc_md=__doc__,
+) as dag:
+    
+    start = EmptyOperator(task_id="start")
+
+    check_files = PythonOperator(
+        task_id="check_for_new_files",
+        python_callable=check_for_new_files,
+    )
+    process_load = PythonOperator(
+        task_id="process_and_load",
+        python_callable=process_and_load_files,
+    )
+    refresh_views = PythonOperator(
+        task_id="refresh_materialized_views",
+        python_callable=refresh_materialized_views,
+    )
+    log_summary = PythonOperator(
+        task_id="log_summary",
+        python_callable=log_pipeline_summary,
+    )
+
+    end = EmptyOperator(task_id="end")
+
+    
