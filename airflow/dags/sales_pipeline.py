@@ -19,25 +19,45 @@ from minio.error import S3Error
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.utils.dates import days_ago
 
 log = logging.getLogger(__name__)
 
 
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
-MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
-SOURCE_BUCKET = os.getenv("MINIO_BUCKET", "sales-data")
+# Static constant — not read from env, so safe at module level
 ARCHIVE_BUCKET = "archive"
 
-DB_CONFIG = {
-    "host": os.getenv("DATA_DB_HOST", "postgres"),
-    "port": int(os.getenv("DATA_DB_PORT", 5432)),
-    "dbname": os.getenv("DATA_DB_NAME", "salesdb"),
-    "user": os.getenv("DATA_DB_USER", "datauser"),
-    "password": os.getenv("DATA_DB_PASSWORD", "datapassword"),
-}
+
+def _get_minio_config() -> dict:
+    """
+    Resolve MinIO settings at task-execution time, not at DAG-parse time.
+    Airflow's scheduler parses DAG files continuously; any os.getenv() at
+    module level is evaluated in the scheduler process and may not see the
+    env vars injected into worker/task processes.  Calling this inside each
+    task callable ensures the live environment is always used.
+    """
+    return {
+        "endpoint":   os.getenv("MINIO_ENDPOINT",   "minio:9000"),
+        "access_key": os.getenv("MINIO_ACCESS_KEY",  "minioadmin"),
+        "secret_key": os.getenv("MINIO_SECRET_KEY",  "minioadmin123"),
+        "bucket":     os.getenv("MINIO_BUCKET",      "sales-data"),
+    }
+
+
+def _get_db_config() -> dict:
+    """
+    Resolve PostgreSQL settings at task-execution time, not at DAG-parse time.
+    Same rationale as _get_minio_config().
+    """
+    return {
+        "host":     os.getenv("DATA_DB_HOST",     "postgres"),
+        "port":     int(os.getenv("DATA_DB_PORT", "5432")),
+        "dbname":   os.getenv("DATA_DB_NAME",     "salesdb"),
+        "user":     os.getenv("DATA_DB_USER",     "datauser"),
+        "password": os.getenv("DATA_DB_PASSWORD", "datapassword"),
+    }
 
 DEFAULT_ARGS = {
     "owner": "data-team",
@@ -57,20 +77,28 @@ EXPECTED_COLUMNS = [
 ]
 
 def get_minio_client() -> Minio:
-    return Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY,
-                 secret_key=MINIO_SECRET_KEY, secure=False)
+    """Return a MinIO client using runtime environment variables."""
+    cfg = _get_minio_config()
+    return Minio(
+        cfg["endpoint"],
+        access_key=cfg["access_key"],
+        secret_key=cfg["secret_key"],
+        secure=False,
+    )
 
 
 def get_db_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    """Return a psycopg2 connection using runtime environment variables."""
+    return psycopg2.connect(**_get_db_config())
 
 
 def check_for_new_files(**context):
     """Scan MinIO 'incoming/' prefix for CSV files to process."""
     client = get_minio_client()
     
+    source_bucket = _get_minio_config()["bucket"]  # resolved at runtime
     try:
-        objects = list(client.list_objects(SOURCE_BUCKET, prefix="incoming/", recursive=True))
+        objects = list(client.list_objects(source_bucket, prefix="incoming/", recursive=True))
     except S3Error as e:
         log.warning(f"MinIO error: {e}")
         objects = []
@@ -83,6 +111,7 @@ def check_for_new_files(**context):
         log.info(f"Found {len(csv_files)} file(s): {csv_files}")
 
     context["ti"].xcom_push(key="files_to_process", value=csv_files)
+    log.info(f"MinIO endpoint in use: {_get_minio_config()['endpoint']}")
     return csv_files
 
 
@@ -95,8 +124,13 @@ def process_and_load_files(**context):
         log.info("No files to process.")
         return {"processed": 0, "total_records": 0}
 
-    client = get_minio_client()
-    conn = get_db_connection()
+    log.info(
+        "DB config in use: host=%s dbname=%s user=%s",
+        _get_db_config()["host"],
+        _get_db_config()["dbname"],
+        _get_db_config()["user"],
+    )
+    client = get_minio_client()  # one client reused across files is fine
 
     total_inserted = 0
     total_failed = 0
@@ -105,10 +139,12 @@ def process_and_load_files(**context):
 
     for object_name in files:
         log.info(f"Processing: {object_name}")
-
+        # Open a fresh connection per file so that a rollback on one file
+        # does not leave the connection in a broken state for subsequent files.
+        conn = get_db_connection()
         try:
-            # Download from MinIO
-            response = client.get_object(SOURCE_BUCKET, object_name)
+            # Download from MinIO  (bucket resolved at runtime, not parse time)
+            response = client.get_object(_get_minio_config()["bucket"], object_name)
             csv_data = response.read().decode("utf-8")
             response.close()
             
@@ -181,21 +217,25 @@ def process_and_load_files(**context):
                 total_inserted += inserted
                 total_failed += failed
 
-                # Archive processed file 
+                # Archive processed file
             archive_name = object_name.replace("incoming/", "processed/")
-            csv_bytes = csv_data
-            client.put_object(ARCHIVE_BUCKET, archive_name,
-                              io.BytesIO(csv_bytes), len(csv_bytes),
-                              content_type="text/csv")
-            client.remove_object(SOURCE_BUCKET, object_name)
+            # Fix: encode str→bytes so len() returns byte-count, not char-count
+            csv_bytes = csv_data.encode("utf-8")
+            source_bucket = _get_minio_config()["bucket"]
+            client.put_object(
+                ARCHIVE_BUCKET, archive_name,
+                io.BytesIO(csv_bytes), len(csv_bytes),
+                content_type="text/csv",
+            )
+            client.remove_object(source_bucket, object_name)
             log.info(f"Archived {object_name} → {ARCHIVE_BUCKET}/{archive_name}")
             files_processed += 1
 
         except Exception as e:
             log.error(f"Failed to process {object_name}: {e}")
             conn.rollback()
-
-    conn.close()
+        finally:
+            conn.close()  # always close, even on partial failure
 
     summary = {
         "files_processed": files_processed,
@@ -251,6 +291,11 @@ with DAG(
     
     start = EmptyOperator(task_id="start")
 
+    generate_data = BashOperator(
+        task_id="generate_data",
+        bash_command="python /opt/airflow/scripts/generate_data.py --upload --rows 1000 --files 3",
+    )
+
     check_files = PythonOperator(
         task_id="check_for_new_files",
         python_callable=check_for_new_files,
@@ -268,9 +313,20 @@ with DAG(
         python_callable=log_pipeline_summary,
     )
 
+    validate_data = BashOperator(
+        task_id="validate_data",
+        bash_command="python /opt/airflow/scripts/validate_data_flow.py",
+        env={
+            "DATA_DB_HOST": os.getenv("DATA_DB_HOST", "postgres"),
+            "MINIO_ENDPOINT": os.getenv("MINIO_ENDPOINT", "minio:9000"),
+            "AIRFLOW_URL": "http://airflow-webserver:8080/health",
+            "METABASE_URL": "http://metabase:3000/api/health"
+        }
+    )
+
     end = EmptyOperator(task_id="end")
 
     # Define task dependencies
-    start >> check_files >> process_load >> refresh_views >> log_summary >> end
+    start >> generate_data >> check_files >> process_load >> refresh_views >> log_summary >> validate_data >> end
 
     

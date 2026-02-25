@@ -81,8 +81,9 @@ def check_minio():
         secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
         secure=False,
     )
+    bucket = os.getenv("MINIO_BUCKET", "sales-data")
     buckets = {b.name for b in client.list_buckets()}
-    assert "sales-data" in buckets, f"Missing 'sales-data' bucket. Found: {buckets}"
+    assert bucket in buckets, f"Missing '{bucket}' bucket. Found: {buckets}"
     return True
 
 
@@ -92,7 +93,10 @@ def check_airflow():
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-            return data.get("status") == "healthy"
+            # Airflow 2.x health JSON: {"metadatabase": {"status": "healthy"}, "scheduler": {"status": "healthy"}}
+            db_status = data.get("metadatabase", {}).get("status")
+            scheduler_status = data.get("scheduler", {}).get("status")
+            return db_status == "healthy" and scheduler_status == "healthy"
     except urllib.error.URLError as e:
         raise RuntimeError(f"Airflow unreachable: {e}")
 
@@ -127,8 +131,9 @@ def check_end_to_end_data_flow():
         secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
         secure=False,
     )
+    bucket = os.getenv("MINIO_BUCKET", "sales-data")
     client.put_object(
-        "sales-data", "incoming/validation_test.csv",
+        bucket, "incoming/validation_test.csv",
         io.BytesIO(csv_bytes), len(csv_bytes),
         content_type="text/csv",
     )

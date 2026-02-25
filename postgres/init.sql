@@ -48,7 +48,7 @@ FROM sales_transactions
 GROUP BY transaction_date, customer_region, product_category;
 
 -- Product performance view
-CREATE VIEW IF NOT EXISTS product_performance AS
+CREATE OR REPLACE VIEW product_performance AS
 SELECT
     product_id,
     product_name,
@@ -62,7 +62,7 @@ FROM sales_transactions
 GROUP BY product_id, product_name, product_category;
 
 -- Customer metrics view
-CREATE VIEW IF NOT EXISTS customer_metrics AS
+CREATE OR REPLACE VIEW customer_metrics AS
 SELECT
     customer_id,
     customer_name,

@@ -1,7 +1,9 @@
 version: '3.8'
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.8.1
+  build:
+    context: .
+    dockerfile: airflow/Dockerfile
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -21,13 +23,14 @@ x-airflow-common: &airflow-common
     DATA_DB_NAME: salesdb
     DATA_DB_USER: datauser
     DATA_DB_PASSWORD: datapassword
-    _PIP_ADDITIONAL_REQUIREMENTS: "minio pandas psycopg2-binary boto3"
+    # Packages installed via Dockerfile (requirement-airflow.txt)
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
     - ./airflow/config:/opt/airflow/config
     - ./data:/opt/airflow/data
+    - ./scripts:/opt/airflow/scripts
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     postgres:
