@@ -1,0 +1,234 @@
+name: CI/CD — Mini Data Platform
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/mini-data-platform
+
+jobs:
+  # Lint & Validate Code 
+  lint:
+    name: Lint & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install flake8 black isort
+
+      - name: Run Black (formatting check)
+        run: black --check scripts/ airflow/dags/
+
+      - name: Run Flake8 (style check)
+        run: flake8 scripts/ airflow/dags/ --max-line-length=120 --ignore=E501,W503
+
+      - name: Validate docker-compose syntax
+        run: |
+          pip install docker-compose
+          docker-compose config --quiet
+
+  # Build Docker Images 
+  build:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - name: airflow-custom
+            context: .
+            dockerfile: ./airflow/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Integration Tests 
+  integration-test:
+    name: Integration Tests (Data Flow Validation)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set AIRFLOW_UID
+        run: echo "AIRFLOW_UID=$(id -u)" >> $GITHUB_ENV
+
+      - name: Create Airflow directories
+        run: |
+          mkdir -p airflow/logs airflow/plugins airflow/config
+          chmod -R 777 airflow/logs
+
+      - name: Start platform services
+        run: |
+          docker-compose up -d postgres minio
+          echo "Waiting for core services..."
+          sleep 20
+
+      - name: Initialize MinIO buckets
+        run: docker-compose run --rm minio-init
+
+      - name: Start Airflow
+        run: |
+          docker-compose run --rm airflow-init
+          docker-compose up -d airflow-webserver airflow-scheduler
+          echo "Waiting for Airflow to be ready..."
+          timeout 120 bash -c 'until curl -sf http://localhost:8080/health; do sleep 5; done'
+
+      - name: Start Metabase
+        run: |
+          docker-compose up -d metabase
+          echo "Waiting for Metabase..."
+          timeout 180 bash -c 'until curl -sf http://localhost:3000/api/health; do sleep 10; done'
+
+      - name: Set up Python for validation
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install validation dependencies
+        run: pip install minio psycopg2-binary pandas
+
+      - name: Generate sample data
+        run: |
+          python scripts/generate_data.py --rows 100 --files 1 --output-dir ./data/sample
+          echo "Sample data generated:"
+          ls -la data/sample/
+
+      - name: Upload sample data to MinIO
+        run: |
+          python scripts/generate_data.py --rows 50 --files 1 --upload
+        env:
+          MINIO_ENDPOINT: localhost:9000
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin123
+
+      - name: Trigger Airflow DAG
+        run: |
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -u admin:admin \
+            http://localhost:8080/api/v1/dags/sales_data_pipeline/dagRuns \
+            -d '{"conf": {}}'
+          echo "Waiting for DAG run..."
+          sleep 60
+
+      - name: Run Data Flow Validation
+        run: python scripts/validate_data_flow.py
+        env:
+          DATA_DB_HOST: localhost
+          DATA_DB_PORT: 5432
+          DATA_DB_NAME: salesdb
+          DATA_DB_USER: datauser
+          DATA_DB_PASSWORD: datapassword
+          MINIO_ENDPOINT: localhost:9000
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin123
+          AIRFLOW_URL: http://localhost:8080/health
+          METABASE_URL: http://localhost:3000/api/health
+
+      - name: Verify records in PostgreSQL
+        run: |
+          python - <<'EOF'
+          import psycopg2, sys
+          conn = psycopg2.connect(
+              host="localhost", port=5432, dbname="salesdb",
+              user="datauser", password="datapassword"
+          )
+          with conn.cursor() as cur:
+              cur.execute("SELECT COUNT(*) FROM sales_transactions")
+              count = cur.fetchone()[0]
+              print(f"✅ Records in PostgreSQL: {count}")
+              if count == 0:
+                  print("❌ No records found!")
+                  sys.exit(1)
+          conn.close()
+          EOF
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          docker-compose logs airflow-webserver 2>&1 | tail -50
+          docker-compose logs airflow-scheduler 2>&1 | tail -50
+          docker-compose logs postgres 2>&1 | tail -30
+
+      - name: Cleanup
+        if: always()
+        run: docker-compose down -v
+
+  # Deploy to Test Environment 
+  deploy-test:
+    name: Deploy to Test Environment
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy notification
+        run: |
+          echo "🚀 Deploying Mini Data Platform to test environment"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+
+      # In a real environment, add deployment steps here:
+      # - SSH to test server and pull latest images
+      # - Run docker-compose pull && docker-compose up -d
+      # Example using SSH:
+      # - name: Deploy via SSH
+      #   uses: appleboy/ssh-action@v1
+      #   with:
+      #     host: ${{ secrets.TEST_SERVER_HOST }}
+      #     username: ${{ secrets.TEST_SERVER_USER }}
+      #     key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+      #     script: |
+      #       cd /opt/mini-data-platform
+      #       git pull origin main
+      #       docker-compose pull
+      #       docker-compose up -d
+      #       python scripts/validate_data_flow.py
+
+      - name: Deployment complete
+        run: |
+          echo "✅ Deployment complete!"
+          echo "Services:"
+          echo "  - Airflow:  http://your-server:8080"
+          echo "  - MinIO:    http://your-server:9001"
+          echo "  - Metabase: http://your-server:3000"
