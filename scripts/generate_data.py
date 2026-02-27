@@ -5,11 +5,11 @@ Generates realistic fake sales data and uploads to MinIO.
 Usage: python generate_data.py [--rows 1000] [--files 3] [--upload]
 """
 
+import argparse
 import csv
+import os
 import random
 import uuid
-import argparse
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 

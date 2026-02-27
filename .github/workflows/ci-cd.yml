@@ -27,15 +27,16 @@ jobs:
         run: pip install flake8 black isort
 
       - name: Run Black (formatting check)
-        run: black --check scripts/ airflow/dags/
+        run: black --check --line-length 120 scripts/ airflow/dags/
+
+      - name: Run isort (import sorting check)
+        run: isort --check-only scripts/ airflow/dags/
 
       - name: Run Flake8 (style check)
         run: flake8 scripts/ airflow/dags/ --max-line-length=120 --ignore=E501,W503
 
-      - name: Validate docker-compose syntax
-        run: |
-          pip install docker-compose
-          docker-compose config --quiet
+      - name: Validate Docker Compose syntax
+        run: docker compose config --quiet
 
   # Build Docker Images 
   build:
@@ -96,23 +97,23 @@ jobs:
 
       - name: Start platform services
         run: |
-          docker-compose up -d postgres minio
+          docker compose up -d postgres minio
           echo "Waiting for core services..."
           sleep 20
 
       - name: Initialize MinIO buckets
-        run: docker-compose run --rm minio-init
+        run: docker compose run --rm minio-init
 
       - name: Start Airflow
         run: |
-          docker-compose run --rm airflow-init
-          docker-compose up -d airflow-webserver airflow-scheduler
+          docker compose run --rm airflow-init
+          docker compose up -d airflow-webserver airflow-scheduler
           echo "Waiting for Airflow to be ready..."
           timeout 120 bash -c 'until curl -sf http://localhost:8080/health; do sleep 5; done'
 
       - name: Start Metabase
         run: |
-          docker-compose up -d metabase
+          docker compose up -d metabase
           echo "Waiting for Metabase..."
           timeout 180 bash -c 'until curl -sf http://localhost:3000/api/health; do sleep 10; done'
 
@@ -140,13 +141,41 @@ jobs:
 
       - name: Trigger Airflow DAG
         run: |
-          curl -s -X POST \
-            -H "Content-Type: application/json" \
-            -u admin:admin \
-            http://localhost:8080/api/v1/dags/sales_data_pipeline/dagRuns \
-            -d '{"conf": {}}'
-          echo "Waiting for DAG run..."
-          sleep 60
+          DAG_ID="sales_data_pipeline"
+          RUN_URL="http://localhost:8080/api/v1/dags/$DAG_ID/dagRuns"
+          
+          echo "Triggering DAG: $DAG_ID"
+          RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -u admin:admin "$RUN_URL" -d '{"conf": {}}')
+          DAG_RUN_ID=$(echo $RESPONSE | jq -r '.dag_run_id')
+          
+          if [ "$DAG_RUN_ID" == "null" ] || [ -z "$DAG_RUN_ID" ]; then
+            echo "❌ Failed to trigger DAG: $RESPONSE"
+            exit 1
+          fi
+          echo "✅ Triggered DAG run: $DAG_RUN_ID"
+          
+          # Poll for completion
+          echo "Waiting for DAG run to complete..."
+          STATE="queued"
+          ATTEMPTS=0
+          MAX_ATTEMPTS=20 # 20 * 15s = 5 minutes
+          
+          while [ "$STATE" != "success" ] && [ "$STATE" != "failed" ]; do
+            if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+              echo "❌ Timeout: DAG run took too long"
+              exit 1
+            fi
+            sleep 15
+            STATE=$(curl -s -u admin:admin "$RUN_URL/$DAG_RUN_ID" | jq -r '.state')
+            echo "Current state: $STATE (Attempt $((ATTEMPTS+1))/$MAX_ATTEMPTS)"
+            ATTEMPTS=$((ATTEMPTS+1))
+          done
+          
+          if [ "$STATE" == "failed" ]; then
+            echo "❌ DAG run failed!"
+            exit 1
+          fi
+          echo "✅ DAG run finished successfully."
 
       - name: Run Data Flow Validation
         run: python scripts/validate_data_flow.py
@@ -183,13 +212,13 @@ jobs:
       - name: Collect logs on failure
         if: failure()
         run: |
-          docker-compose logs airflow-webserver 2>&1 | tail -50
-          docker-compose logs airflow-scheduler 2>&1 | tail -50
-          docker-compose logs postgres 2>&1 | tail -30
+          docker compose logs airflow-webserver 2>&1 | tail -50
+          docker compose logs airflow-scheduler 2>&1 | tail -50
+          docker compose logs postgres 2>&1 | tail -30
 
       - name: Cleanup
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v
 
   # Deploy to Test Environment 
   deploy-test:

@@ -10,14 +10,15 @@ Exit codes:
   1 = one or more checks failed
 """
 
-import sys
-import time
 import io
 import json
-import urllib.request
-import urllib.error
 import logging
 import os
+import sys
+import time
+import urllib.error
+import urllib.request
+
 import psycopg2
 from minio import Minio
 
@@ -40,6 +41,7 @@ def check(name: str, fn):
         return False
 
 def check_postgres():
+    """Verify connectivity to PostgreSQL."""
 
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
@@ -53,6 +55,7 @@ def check_postgres():
     return True
 
 def check_postgres_schema():
+    """Verify that required tables exist in PostgreSQL."""
 
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
@@ -74,6 +77,7 @@ def check_postgres_schema():
     return True
 
 def check_minio():
+    """Verify connectivity and bucket existence in MinIO."""
 
     client = Minio(
         os.getenv("MINIO_ENDPOINT", "localhost:9000"),
@@ -88,6 +92,7 @@ def check_minio():
 
 
 def check_airflow():
+    """Verify Airflow health endpoint."""
     url = os.getenv("AIRFLOW_URL", "http://localhost:8080/health")
     try:
         req = urllib.request.Request(url)
@@ -101,6 +106,7 @@ def check_airflow():
         raise RuntimeError(f"Airflow unreachable: {e}")
 
 def check_metabase():
+    """Verify Metabase health endpoint."""
 
     url = os.getenv("METABASE_URL", "http://localhost:3000/api/health")
     try:

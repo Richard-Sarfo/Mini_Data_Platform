@@ -8,20 +8,19 @@ Schedule: Every hour
 
 
 import io
-import os
 import logging
+import os
 from datetime import datetime, timedelta
 
 import pandas as pd
 import psycopg2
-from minio import Minio
-from minio.error import S3Error
-
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
+from minio import Minio
+from minio.error import S3Error
 
 log = logging.getLogger(__name__)
 
@@ -39,10 +38,10 @@ def _get_minio_config() -> dict:
     task callable ensures the live environment is always used.
     """
     return {
-        "endpoint":   os.getenv("MINIO_ENDPOINT",   "minio:9000"),
-        "access_key": os.getenv("MINIO_ACCESS_KEY",  "minioadmin"),
-        "secret_key": os.getenv("MINIO_SECRET_KEY",  "minioadmin123"),
-        "bucket":     os.getenv("MINIO_BUCKET",      "sales-data"),
+        "endpoint": os.getenv("MINIO_ENDPOINT", "minio:9000"),
+        "access_key": os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
+        "secret_key": os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
+        "bucket": os.getenv("MINIO_BUCKET", "sales-data"),
     }
 
 
@@ -52,17 +51,17 @@ def _get_db_config() -> dict:
     Same rationale as _get_minio_config().
     """
     return {
-        "host":     os.getenv("DATA_DB_HOST",     "postgres"),
-        "port":     int(os.getenv("DATA_DB_PORT", "5432")),
-        "dbname":   os.getenv("DATA_DB_NAME",     "salesdb"),
-        "user":     os.getenv("DATA_DB_USER",     "datauser"),
+        "host": os.getenv("DATA_DB_HOST", "postgres"),
+        "port": int(os.getenv("DATA_DB_PORT", "5432")),
+        "dbname": os.getenv("DATA_DB_NAME", "salesdb"),
+        "user": os.getenv("DATA_DB_USER", "datauser"),
         "password": os.getenv("DATA_DB_PASSWORD", "datapassword"),
     }
 
 DEFAULT_ARGS = {
     "owner": "data-team",
     "depends_on_past": False,
-    "email": [" richard.sarfo@amalitech.com"],
+    "email": ["richard.sarfo@amalitech.com"],
     "email_on_failure": True,
     "email_on_retry": False,
     "retries": 2,
@@ -148,10 +147,10 @@ def process_and_load_files(**context):
             csv_data = response.read().decode("utf-8")
             response.close()
             
-            #load into dataframe
+            # load into dataframe
             df = pd.read_csv(io.BytesIO(csv_data.encode("utf-8")))
 
-            # Validation 
+            # Validation
             missing_cols = [c for c in EXPECTED_COLUMNS if c not in df.columns]
             if missing_cols:
                 log.warning(f"Missing columns in {object_name}: {missing_cols}")
