@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/mini-data-platform
+  IMAGE_PREFIX: richard-sarfo/mini-data-platform
 
 jobs:
   # Lint & Validate Code 
