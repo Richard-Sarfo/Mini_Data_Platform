@@ -3,7 +3,7 @@
 Data Flow Validation Script
 ============================
 Validates that data moves correctly through:
-MinIO (ingest) → Airflow (process) → PostgreSQL (store) → Metabase (visualize)
+MinIO (ingest) -> Airflow (process) -> PostgreSQL (store) -> Metabase (visualize)
 
 Exit codes:
   0 = all checks passed
@@ -44,7 +44,6 @@ def check(name: str, fn):
 
 def check_postgres():
     """Verify connectivity to PostgreSQL."""
-
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
         port=int(os.getenv("DATA_DB_PORT", 5432)),
@@ -59,7 +58,6 @@ def check_postgres():
 
 def check_postgres_schema():
     """Verify that required tables exist in PostgreSQL."""
-
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
         port=int(os.getenv("DATA_DB_PORT", 5432)),
@@ -84,7 +82,6 @@ def check_postgres_schema():
 
 def check_minio():
     """Verify connectivity and bucket existence in MinIO."""
-
     client = Minio(
         os.getenv("MINIO_ENDPOINT", "localhost:9000"),
         access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
@@ -104,7 +101,8 @@ def check_airflow():
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-            # Airflow 2.x health JSON: {"metadatabase": {"status": "healthy"}, "scheduler": {"status": "healthy"}}
+            # Airflow 2.x health JSON:
+            # {"metadatabase": {"status": "healthy"}, "scheduler": {"status": "healthy"}}
             db_status = data.get("metadatabase", {}).get("status")
             scheduler_status = data.get("scheduler", {}).get("status")
             return db_status == "healthy" and scheduler_status == "healthy"
@@ -114,7 +112,6 @@ def check_airflow():
 
 def check_metabase():
     """Verify Metabase health endpoint."""
-
     url = os.getenv("METABASE_URL", "http://localhost:3000/api/health")
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
@@ -125,7 +122,7 @@ def check_metabase():
 
 
 def check_end_to_end_data_flow():
-    """Upload a test CSV → trigger pipeline check → verify DB record."""
+    """Upload a test CSV, trigger pipeline check, verify DB record."""
     # Generate a unique test transaction
     test_id = f"TXN-VALIDATION-{int(time.time())}"
     csv_content = (
@@ -161,7 +158,7 @@ def check_end_to_end_data_flow():
 
 def main():
     log.info("=" * 55)
-    log.info("  MINI DATA PLATFORM — DATA FLOW VALIDATION")
+    log.info("  MINI DATA PLATFORM - DATA FLOW VALIDATION")
     log.info("=" * 55)
 
     check("PostgreSQL connectivity", check_postgres)
@@ -179,10 +176,10 @@ def main():
     failed = sum(1 for _, status, _ in RESULTS if status == "FAIL")
 
     for name, status, error in RESULTS:
-        icon = "✅" if status == "PASS" else "❌"
-        line = f"  {icon} {name}"
+        icon = "PASS" if status == "PASS" else "FAIL"
+        line = f"  [{icon}] {name}"
         if error:
-            line += f"  →  {error}"
+            line += f"  ->  {error}"
         log.info(line)
 
     log.info(f"\n  Passed: {passed}/{len(RESULTS)}")
