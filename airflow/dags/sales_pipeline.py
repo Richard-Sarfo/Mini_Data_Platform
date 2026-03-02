@@ -68,12 +68,14 @@ DEFAULT_ARGS = {
     "retry_delay": timedelta(minutes=5),
 }
 
+
 EXPECTED_COLUMNS = [
     "transaction_id", "transaction_date", "customer_id", "customer_name",
     "customer_email", "customer_region", "product_id", "product_name",
     "product_category", "quantity", "unit_price", "total_amount",
     "discount", "payment_method", "order_status",
 ]
+
 
 def get_minio_client() -> Minio:
     """Return a MinIO client using runtime environment variables."""
@@ -94,7 +96,6 @@ def get_db_connection():
 def check_for_new_files(**context):
     """Scan MinIO 'incoming/' prefix for CSV files to process."""
     client = get_minio_client()
-    
     source_bucket = _get_minio_config()["bucket"]  # resolved at runtime
     try:
         objects = list(client.list_objects(source_bucket, prefix="incoming/", recursive=True))
@@ -135,18 +136,17 @@ def process_and_load_files(**context):
     total_failed = 0
     files_processed = 0
 
-
     for object_name in files:
         log.info(f"Processing: {object_name}")
         # Open a fresh connection per file so that a rollback on one file
         # does not leave the connection in a broken state for subsequent files.
         conn = get_db_connection()
         try:
-            # Download from MinIO  (bucket resolved at runtime, not parse time)
+            # Download from MinIO (bucket resolved at runtime, not parse time)
             response = client.get_object(_get_minio_config()["bucket"], object_name)
             csv_data = response.read().decode("utf-8")
             response.close()
-            
+
             # load into dataframe
             df = pd.read_csv(io.BytesIO(csv_data.encode("utf-8")))
 
@@ -180,7 +180,7 @@ def process_and_load_files(**context):
                 INSERT INTO sales_transactions (
                     transaction_id, transaction_date, customer_id, customer_name,
                     customer_email, customer_region, product_id, product_name, product_category,
-                    quantity, unit_price, total_amount, discount, payment_method, order_status  
+                    quantity, unit_price, total_amount, discount, payment_method, order_status
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             inserted = 0
@@ -244,6 +244,7 @@ def process_and_load_files(**context):
     ti.xcom_push(key="processing_summary", value=summary)
     return summary
 
+
 def refresh_materialized_views(**context):
     """Refresh PostgreSQL materialized views for Metabase dashboards."""
     conn = get_db_connection()
@@ -257,6 +258,7 @@ def refresh_materialized_views(**context):
         conn.rollback()
     finally:
         conn.close()
+
 
 def log_pipeline_summary(**context):
     """Log final pipeline execution summary."""
