@@ -96,6 +96,7 @@ def generate_transaction():
         "order_status": random.choice(ORDER_STATUSES),
     }
 
+
 def generate_csv(filepath: str, num_rows: int = 500):
     """Generate a CSV file with fake sales data."""
     Path(filepath).parent.mkdir(parents=True, exist_ok=True)
@@ -109,6 +110,7 @@ def generate_csv(filepath: str, num_rows: int = 500):
 
     print(f"Generated {num_rows} rows → {filepath}")
     return filepath
+
 
 def upload_to_minio(filepath: str, bucket: str = "sales-data"):
     """Upload a CSV file to MinIO."""
@@ -130,7 +132,6 @@ def upload_to_minio(filepath: str, bucket: str = "sales-data"):
     object_name = f"incoming/{filename}"
     client.fput_object(bucket, object_name, filepath)
     print(f"Uploaded {filename} → minio://{bucket}/{object_name}")
-
 
 
 def main():
