@@ -92,8 +92,8 @@ jobs:
 
       - name: Create Airflow directories
         run: |
-          mkdir -p airflow/logs airflow/plugins airflow/config
-          chmod -R 777 airflow/logs
+          mkdir -p airflow/logs airflow/plugins airflow/config data/sample
+          chmod -R 777 airflow/logs data/sample
 
       - name: Start platform services
         run: |
