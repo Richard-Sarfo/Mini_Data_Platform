@@ -24,10 +24,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install linting tools
-        run: pip install flake8 black isort
+        run: pip install flake8 'black==25.11.0' 'isort==6.1.0'
 
       - name: Run Black (formatting check)
-        run: black --check --line-length 120 scripts/ airflow/dags/
+        run: black --check scripts/ airflow/dags/
 
       - name: Run isort (import sorting check)
         run: isort --check-only scripts/ airflow/dags/
