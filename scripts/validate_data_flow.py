@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 
 RESULTS = []
 
+
 def check(name: str, fn):
     """Run a check function and record the result."""
     try:
@@ -39,6 +40,7 @@ def check(name: str, fn):
         RESULTS.append((name, "FAIL", str(e)))
         log.error(f"[FAIL] {name}: {e}")
         return False
+
 
 def check_postgres():
     """Verify connectivity to PostgreSQL."""
@@ -53,6 +55,7 @@ def check_postgres():
     )
     conn.close()
     return True
+
 
 def check_postgres_schema():
     """Verify that required tables exist in PostgreSQL."""
@@ -75,6 +78,7 @@ def check_postgres_schema():
     assert "sales_transactions" in tables, "Missing sales_transactions table"
     assert "pipeline_runs" in tables, "Missing pipeline_runs table"
     return True
+
 
 def check_minio():
     """Verify connectivity and bucket existence in MinIO."""
@@ -105,6 +109,7 @@ def check_airflow():
     except urllib.error.URLError as e:
         raise RuntimeError(f"Airflow unreachable: {e}")
 
+
 def check_metabase():
     """Verify Metabase health endpoint."""
 
@@ -115,10 +120,10 @@ def check_metabase():
             return data.get("status") == "ok"
     except urllib.error.URLError as e:
         raise RuntimeError(f"Metabase unreachable: {e}")
-    
+
+
 def check_end_to_end_data_flow():
     """Upload a test CSV → trigger pipeline check → verify DB record."""
-  
     # Generate a unique test transaction
     test_id = f"TXN-VALIDATION-{int(time.time())}"
     csv_content = (
