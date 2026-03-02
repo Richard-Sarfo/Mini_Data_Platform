@@ -68,11 +68,13 @@ def check_postgres_schema():
         password=os.getenv("DATA_DB_PASSWORD", "datapassword"),
     )
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT table_name FROM information_schema.tables
             WHERE table_schema = 'public'
             AND table_name IN ('sales_transactions', 'pipeline_runs')
-        """)
+        """
+        )
         tables = {r[0] for r in cur.fetchall()}
     conn.close()
     assert "sales_transactions" in tables, "Missing sales_transactions table"
@@ -144,8 +146,10 @@ def check_end_to_end_data_flow():
     )
     bucket = os.getenv("MINIO_BUCKET", "sales-data")
     client.put_object(
-        bucket, "incoming/validation_test.csv",
-        io.BytesIO(csv_bytes), len(csv_bytes),
+        bucket,
+        "incoming/validation_test.csv",
+        io.BytesIO(csv_bytes),
+        len(csv_bytes),
         content_type="text/csv",
     )
     log.info(f"Uploaded validation file with transaction_id: {test_id}")
@@ -153,6 +157,7 @@ def check_end_to_end_data_flow():
     # Note: Full end-to-end requires Airflow to run DAG.
     # This check validates the upload succeeded.
     return True
+
 
 def main():
     log.info("=" * 55)

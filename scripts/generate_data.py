@@ -16,6 +16,7 @@ from pathlib import Path
 # Optional MinIO upload
 try:
     from minio import Minio
+
     MINIO_AVAILABLE = True
 except ImportError:
     MINIO_AVAILABLE = False
@@ -25,7 +26,7 @@ PRODUCTS = [
     ("P002", "Wireless Mouse", "Electronics", 29.99),
     ("P003", "USB-C Hub", "Electronics", 49.99),
     ("P004", "Mechanical Keyboard", "Electronics", 149.99),
-    ("P005", "Monitor 27\"", "Electronics", 449.99),
+    ("P005", 'Monitor 27"', "Electronics", 449.99),
     ("P006", "Office Chair", "Furniture", 399.99),
     ("P007", "Standing Desk", "Furniture", 699.99),
     ("P008", "Notebook Set", "Stationery", 14.99),

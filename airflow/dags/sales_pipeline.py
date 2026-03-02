@@ -6,7 +6,6 @@ Flow: MinIO (CSV files) → Clean & Validate → PostgreSQL → Refresh Views
 Schedule: Every hour
 """
 
-
 import io
 import logging
 import os
@@ -14,13 +13,14 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import psycopg2
-from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from minio import Minio
 from minio.error import S3Error
+
+from airflow import DAG
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ def _get_db_config() -> dict:
         "password": os.getenv("DATA_DB_PASSWORD", "datapassword"),
     }
 
+
 DEFAULT_ARGS = {
     "owner": "data-team",
     "depends_on_past": False,
@@ -70,10 +71,21 @@ DEFAULT_ARGS = {
 
 
 EXPECTED_COLUMNS = [
-    "transaction_id", "transaction_date", "customer_id", "customer_name",
-    "customer_email", "customer_region", "product_id", "product_name",
-    "product_category", "quantity", "unit_price", "total_amount",
-    "discount", "payment_method", "order_status",
+    "transaction_id",
+    "transaction_date",
+    "customer_id",
+    "customer_name",
+    "customer_email",
+    "customer_region",
+    "product_id",
+    "product_name",
+    "product_category",
+    "quantity",
+    "unit_price",
+    "total_amount",
+    "discount",
+    "payment_method",
+    "order_status",
 ]
 
 
@@ -188,28 +200,49 @@ def process_and_load_files(**context):
             with conn.cursor() as cur:
                 for _, row in df.iterrows():
                     try:
-                        cur.execute(insert_sql, (
-                            row["transaction_id"], row["transaction_date"], row["customer_id"],
-                            row["customer_name"], row["customer_email"], row["customer_region"],
-                            row["product_id"], row["product_name"], row["product_category"],
-                            row["quantity"], row["unit_price"], row["total_amount"],
-                            row["discount"], row["payment_method"], row["order_status"]
-                        ))
+                        cur.execute(
+                            insert_sql,
+                            (
+                                row["transaction_id"],
+                                row["transaction_date"],
+                                row["customer_id"],
+                                row["customer_name"],
+                                row["customer_email"],
+                                row["customer_region"],
+                                row["product_id"],
+                                row["product_name"],
+                                row["product_category"],
+                                row["quantity"],
+                                row["unit_price"],
+                                row["total_amount"],
+                                row["discount"],
+                                row["payment_method"],
+                                row["order_status"],
+                            ),
+                        )
                         inserted += 1
                     except Exception as row_err:
                         log.error(f"Row error: {row_err}")
                         failed += 1
 
                 # Log pipeline run
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO pipeline_runs
                         (run_id, dag_id, file_processed, records_ingested, records_failed, status, started_at, completed_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    context["run_id"], context["dag"].dag_id, object_name,
-                    inserted, failed, "success",
-                    context["data_interval_start"], datetime.now(),
-                ))
+                """,
+                    (
+                        context["run_id"],
+                        context["dag"].dag_id,
+                        object_name,
+                        inserted,
+                        failed,
+                        "success",
+                        context["data_interval_start"],
+                        datetime.now(),
+                    ),
+                )
 
                 conn.commit()
                 log.info(f"Loaded {inserted} rows, {failed} failed from {object_name}")
@@ -222,8 +255,10 @@ def process_and_load_files(**context):
             csv_bytes = csv_data.encode("utf-8")
             source_bucket = _get_minio_config()["bucket"]
             client.put_object(
-                ARCHIVE_BUCKET, archive_name,
-                io.BytesIO(csv_bytes), len(csv_bytes),
+                ARCHIVE_BUCKET,
+                archive_name,
+                io.BytesIO(csv_bytes),
+                len(csv_bytes),
                 content_type="text/csv",
             )
             client.remove_object(source_bucket, object_name)
@@ -289,7 +324,7 @@ with DAG(
     tags=["sales", "etl", "production"],
     doc_md=__doc__,
 ) as dag:
-    
+
     start = EmptyOperator(task_id="start")
 
     generate_data = BashOperator(
@@ -321,13 +356,11 @@ with DAG(
             "DATA_DB_HOST": os.getenv("DATA_DB_HOST", "postgres"),
             "MINIO_ENDPOINT": os.getenv("MINIO_ENDPOINT", "minio:9000"),
             "AIRFLOW_URL": "http://airflow-webserver:8080/health",
-            "METABASE_URL": "http://metabase:3000/api/health"
-        }
+            "METABASE_URL": "http://metabase:3000/api/health",
+        },
     )
 
     end = EmptyOperator(task_id="end")
 
     # Define task dependencies
     start >> generate_data >> check_files >> process_load >> refresh_views >> log_summary >> validate_data >> end
-
-    
