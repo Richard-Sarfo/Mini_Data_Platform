@@ -323,6 +323,7 @@ with DAG(
     catchup=False,
     tags=["sales", "etl", "production"],
     doc_md=__doc__,
+    is_paused_upon_creation=False,
 ) as dag:
 
     start = EmptyOperator(task_id="start")

@@ -142,6 +142,10 @@ jobs:
       - name: Trigger Airflow DAG
         run: |
           DAG_ID="sales_data_pipeline"
+          
+          # Unpause the DAG explicitly before triggering
+          docker compose exec -T airflow-scheduler airflow dags unpause "$DAG_ID"
+          
           RUN_URL="http://localhost:8080/api/v1/dags/$DAG_ID/dagRuns"
           
           echo "Triggering DAG: $DAG_ID"
