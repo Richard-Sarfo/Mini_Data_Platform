@@ -2,38 +2,6 @@
 
 A robust, containerized end-to-end data platform for sales data processing, validation, and visualization.
 
-## 🏗 Architecture
-
-The platform follows a modern data stack architecture:
-
-```mermaid
-graph LR
-    subgraph "Ingestion Source"
-        G["Python Script<br/>(Generate Data)"]
-    end
-
-    subgraph "Object Storage"
-        M["MinIO S3<br/>(Bucket: sales-data)"]
-    end
-
-    subgraph "Orchestration"
-        A["Apache Airflow<br/>(ETL Pipeline)"]
-    end
-
-    subgraph "Data Warehouse"
-        P["PostgreSQL<br/>(Database: salesdb)"]
-    end
-
-    subgraph "BI & Visualization"
-        MB["Metabase<br/>(Dashboards)"]
-    end
-
-    G -- "1. Upload CSV" --> M
-    A -- "2. Monitor & Extract" --> M
-    A -- "3. Clean, Validate & Load" --> P
-    MB -- "4. Visualize Data" --> P
-```
-
 ### Data Flow Steps:
 1.  **Data Generation**: `generate_data.py` creates realistic fake sales records and uploads them to the `incoming/` prefix in MinIO.
 2.  **Detection**: Airflow task `check_for_new_files` scans MinIO for any new `.csv` files.
