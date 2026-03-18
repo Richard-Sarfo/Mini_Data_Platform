@@ -93,7 +93,7 @@ jobs:
       - name: Create Airflow directories
         run: |
           mkdir -p airflow/logs airflow/plugins airflow/config data/sample
-          chmod -R 777 airflow/logs data/sample
+          chmod -R 750 airflow/logs data/sample
 
       - name: Start platform services
         run: |
@@ -136,8 +136,8 @@ jobs:
           python scripts/generate_data.py --rows 50 --files 1 --upload
         env:
           MINIO_ENDPOINT: localhost:9000
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin123
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
 
       - name: Trigger Airflow DAG
         run: |
@@ -149,7 +149,7 @@ jobs:
           RUN_URL="http://localhost:8080/api/v1/dags/$DAG_ID/dagRuns"
           
           echo "Triggering DAG: $DAG_ID"
-          RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -u admin:admin "$RUN_URL" -d '{"conf": {}}')
+          RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -u ${{ secrets.AIRFLOW_USER }}:${{ secrets.AIRFLOW_PASSWORD }} "$RUN_URL" -d '{"conf": {}}')
           DAG_RUN_ID=$(echo $RESPONSE | jq -r '.dag_run_id')
           
           if [ "$DAG_RUN_ID" == "null" ] || [ -z "$DAG_RUN_ID" ]; then
@@ -170,7 +170,7 @@ jobs:
               exit 1
             fi
             sleep 15
-            STATE=$(curl -s -u admin:admin "$RUN_URL/$DAG_RUN_ID" | jq -r '.state')
+            STATE=$(curl -s -u ${{ secrets.AIRFLOW_USER }}:${{ secrets.AIRFLOW_PASSWORD }} "$RUN_URL/$DAG_RUN_ID" | jq -r '.state')
             echo "Current state: $STATE (Attempt $((ATTEMPTS+1))/$MAX_ATTEMPTS)"
             ATTEMPTS=$((ATTEMPTS+1))
           done
@@ -186,22 +186,22 @@ jobs:
         env:
           DATA_DB_HOST: localhost
           DATA_DB_PORT: 5432
-          DATA_DB_NAME: salesdb
-          DATA_DB_USER: datauser
-          DATA_DB_PASSWORD: datapassword
+          DATA_DB_NAME: ${{ secrets.DB_NAME }}
+          DATA_DB_USER: ${{ secrets.DB_USER }}
+          DATA_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           MINIO_ENDPOINT: localhost:9000
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin123
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
           AIRFLOW_URL: http://localhost:8080/health
           METABASE_URL: http://localhost:3000/api/health
 
       - name: Verify records in PostgreSQL
         run: |
           python - <<'EOF'
-          import psycopg2, sys
+          import psycopg2, sys, os
           conn = psycopg2.connect(
-              host="localhost", port=5432, dbname="salesdb",
-              user="datauser", password="datapassword"
+              host="localhost", port=5432, dbname=os.environ['DB_NAME'],
+              user=os.environ['DB_USER'], password=os.environ['DB_PASSWORD']
           )
           with conn.cursor() as cur:
               cur.execute("SELECT COUNT(*) FROM sales_transactions")
@@ -241,27 +241,23 @@ jobs:
           echo "Commit: ${{ github.sha }}"
           echo "Branch: ${{ github.ref_name }}"
 
-      # In a real environment, add deployment steps here:
-      # - SSH to test server and pull latest images
-      # - Run docker-compose pull && docker-compose up -d
-      # Example using SSH:
-      # - name: Deploy via SSH
-      #   uses: appleboy/ssh-action@v1
-      #   with:
-      #     host: ${{ secrets.TEST_SERVER_HOST }}
-      #     username: ${{ secrets.TEST_SERVER_USER }}
-      #     key: ${{ secrets.TEST_SERVER_SSH_KEY }}
-      #     script: |
-      #       cd /opt/mini-data-platform
-      #       git pull origin main
-      #       docker-compose pull
-      #       docker-compose up -d
-      #       python scripts/validate_data_flow.py
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.TEST_SERVER_HOST }}
+          username: ${{ secrets.TEST_SERVER_USER }}
+          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+          script: |
+            cd /opt/mini-data-platform
+            git pull origin main
+            docker-compose pull
+            docker-compose up -d
+            python scripts/validate_data_flow.py
 
       - name: Deployment complete
         run: |
           echo "✅ Deployment complete!"
           echo "Services:"
-          echo "  - Airflow:  http://your-server:8080"
-          echo "  - MinIO:    http://your-server:9001"
-          echo "  - Metabase: http://your-server:3000"
+          echo "  - Airflow:  http://${{ secrets.TEST_SERVER_HOST }}:8080"
+          echo "  - MinIO:    http://${{ secrets.TEST_SERVER_HOST }}:9001"
+          echo "  - Metabase: http://${{ secrets.TEST_SERVER_HOST }}:3000"
