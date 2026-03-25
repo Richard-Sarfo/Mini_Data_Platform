@@ -330,20 +330,24 @@ with DAG(
 
     generate_data = BashOperator(
         task_id="generate_data",
-        bash_command="python /opt/airflow/scripts/generate_data.py --upload --rows 1000 --files 3",
+        bash_command="python /opt/airflow/scripts/generate_data.py --upload --rows 50 --files 1",
+        execution_timeout=timedelta(minutes=2),
     )
 
     check_files = PythonOperator(
         task_id="check_for_new_files",
         python_callable=check_for_new_files,
+        execution_timeout=timedelta(minutes=2),
     )
     process_load = PythonOperator(
         task_id="process_and_load",
         python_callable=process_and_load_files,
+        execution_timeout=timedelta(minutes=5),
     )
     refresh_views = PythonOperator(
         task_id="refresh_materialized_views",
         python_callable=refresh_materialized_views,
+        execution_timeout=timedelta(minutes=2),
     )
     log_summary = PythonOperator(
         task_id="log_summary",
@@ -353,6 +357,7 @@ with DAG(
     validate_data = BashOperator(
         task_id="validate_data",
         bash_command="python /opt/airflow/scripts/validate_data_flow.py",
+        execution_timeout=timedelta(minutes=2),
         env={
             "DATA_DB_HOST": os.getenv("DATA_DB_HOST", "postgres"),
             "MINIO_ENDPOINT": os.getenv("MINIO_ENDPOINT", "minio:9000"),

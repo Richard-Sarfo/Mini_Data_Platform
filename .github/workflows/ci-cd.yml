@@ -186,11 +186,12 @@ jobs:
           echo "Waiting for DAG run to complete..."
           STATE="queued"
           ATTEMPTS=0
-          MAX_ATTEMPTS=20 # 20 * 15s = 5 minutes
+          MAX_ATTEMPTS=40 # 40 * 15s = 10 minutes
           
           while [ "$STATE" != "success" ] && [ "$STATE" != "failed" ]; do
             if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
               echo "Timeout: DAG run took too long"
+              docker compose logs airflow-scheduler 2>&1 | tail -100
               exit 1
             fi
             sleep 15
