@@ -86,6 +86,9 @@ jobs:
     env:
       DATA_DB_HOST: localhost
       DATA_DB_PORT: "5432"
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
       DATA_DB_NAME: ${{ secrets.DATA_DB_NAME }}
       DATA_DB_USER: ${{ secrets.DATA_DB_USER }}
       DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD }}
