@@ -142,6 +142,7 @@ jobs:
       - name: Trigger Airflow DAG
         run: |
           DAG_ID="sales_data_pipeline"
+          AIRFLOW_CREDS="airflow:airflow"
           
           # Unpause the DAG explicitly before triggering
           docker compose exec -T airflow-scheduler airflow dags unpause "$DAG_ID"
@@ -149,7 +150,7 @@ jobs:
           RUN_URL="http://localhost:8080/api/v1/dags/$DAG_ID/dagRuns"
           
           echo "Triggering DAG: $DAG_ID"
-          RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -u ${{ secrets.AIRFLOW_USER }}:${{ secrets.AIRFLOW_PASSWORD }} "$RUN_URL" -d '{"conf": {}}')
+          RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" -u "$AIRFLOW_CREDS" "$RUN_URL" -d '{"conf": {}}')
           DAG_RUN_ID=$(echo $RESPONSE | jq -r '.dag_run_id')
           
           if [ "$DAG_RUN_ID" == "null" ] || [ -z "$DAG_RUN_ID" ]; then
@@ -170,7 +171,7 @@ jobs:
               exit 1
             fi
             sleep 15
-            STATE=$(curl -s -u ${{ secrets.AIRFLOW_USER }}:${{ secrets.AIRFLOW_PASSWORD }} "$RUN_URL/$DAG_RUN_ID" | jq -r '.state')
+            STATE=$(curl -s -u "$AIRFLOW_CREDS" "$RUN_URL/$DAG_RUN_ID" | jq -r '.state')
             echo "Current state: $STATE (Attempt $((ATTEMPTS+1))/$MAX_ATTEMPTS)"
             ATTEMPTS=$((ATTEMPTS+1))
           done
@@ -206,9 +207,9 @@ jobs:
           with conn.cursor() as cur:
               cur.execute("SELECT COUNT(*) FROM sales_transactions")
               count = cur.fetchone()[0]
-              print(f"✅ Records in PostgreSQL: {count}")
+              print(f" Records in PostgreSQL: {count}")
               if count == 0:
-                  print("❌ No records found!")
+                  print(" No records found!")
                   sys.exit(1)
           conn.close()
           EOF
@@ -237,7 +238,7 @@ jobs:
 
       - name: Deploy notification
         run: |
-          echo "🚀 Deploying Mini Data Platform to test environment"
+          echo " Deploying Mini Data Platform to test environment"
           echo "Commit: ${{ github.sha }}"
           echo "Branch: ${{ github.ref_name }}"
 
@@ -256,7 +257,7 @@ jobs:
 
       - name: Deployment complete
         run: |
-          echo "✅ Deployment complete!"
+          echo "Deployment complete!"
           echo "Services:"
           echo "  - Airflow:  http://${{ secrets.TEST_SERVER_HOST }}:8080"
           echo "  - MinIO:    http://${{ secrets.TEST_SERVER_HOST }}:9001"
