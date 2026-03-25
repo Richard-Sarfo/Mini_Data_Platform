@@ -154,10 +154,10 @@ jobs:
           DAG_RUN_ID=$(echo $RESPONSE | jq -r '.dag_run_id')
           
           if [ "$DAG_RUN_ID" == "null" ] || [ -z "$DAG_RUN_ID" ]; then
-            echo "❌ Failed to trigger DAG: $RESPONSE"
+            echo "Failed to trigger DAG: $RESPONSE"
             exit 1
           fi
-          echo "✅ Triggered DAG run: $DAG_RUN_ID"
+          echo "Triggered DAG run: $DAG_RUN_ID"
           
           # Poll for completion
           echo "Waiting for DAG run to complete..."
@@ -167,7 +167,7 @@ jobs:
           
           while [ "$STATE" != "success" ] && [ "$STATE" != "failed" ]; do
             if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
-              echo "❌ Timeout: DAG run took too long"
+              echo "Timeout: DAG run took too long"
               exit 1
             fi
             sleep 15
@@ -177,10 +177,10 @@ jobs:
           done
           
           if [ "$STATE" == "failed" ]; then
-            echo "❌ DAG run failed!"
+            echo " DAG run failed!"
             exit 1
           fi
-          echo "✅ DAG run finished successfully."
+          echo "DAG run finished successfully."
 
       - name: Run Data Flow Validation
         run: python scripts/validate_data_flow.py
@@ -198,9 +198,11 @@ jobs:
 
       - name: Verify records in PostgreSQL
         env:
-          DB_NAME: salesdb
-          DB_USER: datauser
-          DB_PASSWORD: datapassword
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: ${{ secrets.DATA_DB_NAME }}
+          DB_USER: ${{ secrets.DATA_DB_USER }}
+          DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD }}
         run: |
           python - <<'EOF'
           import psycopg2, sys, os
@@ -253,7 +255,7 @@ jobs:
           TEST_SERVER_SSH_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
         run: |
           if [ -z "$TEST_SERVER_HOST" ] || [ -z "$TEST_SERVER_SSH_KEY" ]; then
-            echo "⚠️ TEST_SERVER_HOST or TEST_SERVER_SSH_KEY not configured — skipping SSH deploy."
+            echo "TEST_SERVER_HOST or TEST_SERVER_SSH_KEY not configured — skipping SSH deploy."
             exit 0
           fi
           echo "$TEST_SERVER_SSH_KEY" > /tmp/ssh_key
@@ -265,7 +267,7 @@ jobs:
 
       - name: Deployment complete
         run: |
-          echo "✅ Deployment step finished!"
+          echo "Deployment step finished!"
           echo "Services:"
           echo "  - Airflow:  http://${{ secrets.TEST_SERVER_HOST }}:8080"
           echo "  - MinIO:    http://${{ secrets.TEST_SERVER_HOST }}:9001"
