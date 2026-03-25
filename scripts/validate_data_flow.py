@@ -20,8 +20,9 @@ import urllib.error
 import urllib.request
 
 import psycopg2
-from minio import Minio
 from dotenv import load_dotenv
+from minio import Minio
+
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
@@ -56,7 +57,9 @@ def check_postgres() -> bool:
     conn.close()
     return True
 
+
 REQUIRED_TABLES = {"sales_transactions", "pipeline_runs"}
+
 
 def check_postgres_schema() -> bool:
     """Verify that required tables exist in PostgreSQL."""
@@ -86,8 +89,6 @@ def check_postgres_schema() -> bool:
 
     return True
 
-
-load_dotenv()
 
 def check_minio() -> bool:
     """Verify connectivity and bucket existence in MinIO."""
