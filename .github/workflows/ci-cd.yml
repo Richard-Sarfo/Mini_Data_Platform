@@ -142,7 +142,7 @@ jobs:
       - name: Trigger Airflow DAG
         run: |
           DAG_ID="sales_data_pipeline"
-          AIRFLOW_CREDS="airflow:airflow"
+          AIRFLOW_CREDS="admin:admin"
           
           # Unpause the DAG explicitly before triggering
           docker compose exec -T airflow-scheduler airflow dags unpause "$DAG_ID"
