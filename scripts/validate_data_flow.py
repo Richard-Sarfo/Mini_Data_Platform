@@ -21,7 +21,8 @@ import urllib.request
 
 import psycopg2
 from minio import Minio
-
+from dotenv import load_dotenv
+load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
@@ -42,61 +43,74 @@ def check(name: str, fn):
         return False
 
 
-def check_postgres():
+def check_postgres() -> bool:
     """Verify connectivity to PostgreSQL."""
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
-        port=int(os.getenv("DATA_DB_PORT", 5432)),
-        dbname=os.getenv("DATA_DB_NAME", "salesdb"),
-        user=os.getenv("DATA_DB_USER", "datauser"),
-        password=os.getenv("DATA_DB_PASSWORD", "datapassword"),
+        port=int(os.getenv("DATA_DB_PORT") or 5432),
+        dbname=os.getenv("DATA_DB_NAME"),
+        user=os.getenv("DATA_DB_USER"),
+        password=os.getenv("DATA_DB_PASSWORD"),
         connect_timeout=5,
     )
     conn.close()
     return True
 
+REQUIRED_TABLES = {"sales_transactions", "pipeline_runs"}
 
-def check_postgres_schema():
+def check_postgres_schema() -> bool:
     """Verify that required tables exist in PostgreSQL."""
     conn = psycopg2.connect(
         host=os.getenv("DATA_DB_HOST", "localhost"),
-        port=int(os.getenv("DATA_DB_PORT", 5432)),
-        dbname=os.getenv("DATA_DB_NAME", "salesdb"),
-        user=os.getenv("DATA_DB_USER", "datauser"),
-        password=os.getenv("DATA_DB_PASSWORD", "datapassword"),
+        port=int(os.getenv("DATA_DB_PORT") or 5432),
+        dbname=os.getenv("DATA_DB_NAME"),
+        user=os.getenv("DATA_DB_USER"),
+        password=os.getenv("DATA_DB_PASSWORD"),
+        connect_timeout=5,
     )
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT table_name FROM information_schema.tables
             WHERE table_schema = 'public'
-            AND table_name IN ('sales_transactions', 'pipeline_runs')
-        """
+            AND table_name = ANY(%s)
+            """,
+            (list(REQUIRED_TABLES),),
         )
-        tables = {r[0] for r in cur.fetchall()}
+        found_tables = {r[0] for r in cur.fetchall()}
     conn.close()
-    assert "sales_transactions" in tables, "Missing sales_transactions table"
-    assert "pipeline_runs" in tables, "Missing pipeline_runs table"
+
+    missing = REQUIRED_TABLES - found_tables
+    if missing:
+        raise RuntimeError(f"Missing required tables: {missing}")
+
     return True
 
 
-def check_minio():
+load_dotenv()
+
+def check_minio() -> bool:
     """Verify connectivity and bucket existence in MinIO."""
     client = Minio(
         os.getenv("MINIO_ENDPOINT", "localhost:9000"),
-        access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-        secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
-        secure=False,
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
+        secure=os.getenv("MINIO_SECURE", "false").lower() == "true",
     )
-    bucket = os.getenv("MINIO_BUCKET", "sales-data")
+    bucket = os.getenv("MINIO_BUCKET")
+    if not bucket:
+        raise ValueError("MINIO_BUCKET environment variable is not set")
+
     buckets = {b.name for b in client.list_buckets()}
-    assert bucket in buckets, f"Missing '{bucket}' bucket. Found: {buckets}"
+    if bucket not in buckets:
+        raise RuntimeError(f"Missing '{bucket}' bucket. Found: {buckets}")
+
     return True
 
 
 def check_airflow():
     """Verify Airflow health endpoint."""
-    url = os.getenv("AIRFLOW_URL", "http://localhost:8080/health")
+    url = os.getenv("AIRFLOW_URL")
     try:
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -137,8 +151,8 @@ def check_end_to_end_data_flow():
     # Upload to MinIO
     client = Minio(
         os.getenv("MINIO_ENDPOINT", "localhost:9000"),
-        access_key=os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-        secret_key=os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
         secure=False,
     )
     bucket = os.getenv("MINIO_BUCKET", "sales-data")

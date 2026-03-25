@@ -1,15 +1,19 @@
+#!/bin/bash
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
 -- Create the sales database and user
-CREATE DATABASE salesdb;
+CREATE DATABASE "$DATA_DB_NAME";
 CREATE DATABASE metabase;
 
-CREATE USER datauser WITH PASSWORD 'datapassword';
-GRANT ALL PRIVILEGES ON DATABASE salesdb TO datauser;
-GRANT ALL PRIVILEGES ON DATABASE metabase TO airflow;
+CREATE USER "$DATA_DB_USER" WITH PASSWORD '$DATA_DB_PASSWORD';
+GRANT ALL PRIVILEGES ON DATABASE "$DATA_DB_NAME" TO "$DATA_DB_USER";
+GRANT ALL PRIVILEGES ON DATABASE metabase TO "$POSTGRES_USER";
 
 -- Connect to salesdb and create schema
-\c salesdb
+\c "$DATA_DB_NAME"
 
-GRANT ALL ON SCHEMA public TO datauser;
+GRANT ALL ON SCHEMA public TO "$DATA_DB_USER";
 
 -- Sales transactions table
 CREATE TABLE IF NOT EXISTS sales_transactions (
@@ -89,5 +93,6 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     notes TEXT
 );
 
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO datauser;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO datauser;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "$DATA_DB_USER";
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$DATA_DB_USER";
+EOSQL

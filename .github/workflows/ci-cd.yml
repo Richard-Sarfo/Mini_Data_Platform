@@ -89,9 +89,10 @@ jobs:
       DATA_DB_NAME: ${{ secrets.DATA_DB_NAME }}
       DATA_DB_USER: ${{ secrets.DATA_DB_USER }}
       DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD }}
-      MINIO_ENDPOINT: localhost:9000
       MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
       MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+      AIRFLOW_WWW_USER: ${{ secrets.AIRFLOW_WWW_USER }}
+      AIRFLOW_WWW_PASSWORD: ${{ secrets.AIRFLOW_WWW_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +148,7 @@ jobs:
       - name: Trigger Airflow DAG
         run: |
           DAG_ID="sales_data_pipeline"
-          AIRFLOW_CREDS="admin:admin"
+          AIRFLOW_CREDS="${AIRFLOW_WWW_USER}:${AIRFLOW_WWW_PASSWORD}"
           
           # Unpause the DAG explicitly before triggering
           docker compose exec -T airflow-scheduler airflow dags unpause "$DAG_ID"

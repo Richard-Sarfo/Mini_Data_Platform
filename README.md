@@ -46,8 +46,8 @@ This command builds the custom Airflow image and starts:
 ### 3. Access the Tools
 | Tool | URL | Credentials |
 | :--- | :--- | :--- |
-| **Airflow** | [localhost:8080](http://localhost:8080) | `admin` / `admin` |
-| **MinIO Console** | [localhost:9001](http://localhost:9001) | `minioadmin` / `minioadmin123` |
+| **Airflow** | [localhost:8080](http://localhost:8080) | From `.env` (default: `admin` / `admin`) |
+| **MinIO Console** | [localhost:9001](http://localhost:9001) | From `.env` (default: `minioadmin` / `minioadmin123`) |
 | **Metabase** | [localhost:3000](http://localhost:3000) | Setup wizard on first run |
 
 ### 4. Trigger the Pipeline

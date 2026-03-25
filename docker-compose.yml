@@ -14,8 +14,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     # MinIO connection
     MINIO_ENDPOINT: minio:9000
-    MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-    MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+    MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
     MINIO_BUCKET: sales-data
     # PostgreSQL connection for data
     DATA_DB_HOST: postgres
@@ -45,9 +45,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_MULTIPLE_DATABASES: ${DATA_DB_NAME}
+      DATA_DB_NAME: ${DATA_DB_NAME}
+      DATA_DB_USER: ${DATA_DB_USER}
+      DATA_DB_PASSWORD: ${DATA_DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh
     ports:
       - "5432:5432"
     healthcheck:
@@ -61,8 +64,8 @@ services:
     container_name: mini-dp-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
       - minio_data:/data
     ports:
@@ -80,8 +83,8 @@ services:
     image: minio/mc:latest
     container_name: mini-dp-minio-init
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     depends_on:
       minio:
         condition: service_healthy

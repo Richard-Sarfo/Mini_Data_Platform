@@ -39,8 +39,8 @@ def _get_minio_config() -> dict:
     """
     return {
         "endpoint": os.getenv("MINIO_ENDPOINT", "minio:9000"),
-        "access_key": os.getenv("MINIO_ACCESS_KEY", "minioadmin"),
-        "secret_key": os.getenv("MINIO_SECRET_KEY", "minioadmin123"),
+        "access_key": os.getenv("MINIO_ACCESS_KEY"),
+        "secret_key": os.getenv("MINIO_SECRET_KEY"),
         "bucket": os.getenv("MINIO_BUCKET", "sales-data"),
     }
 
@@ -53,9 +53,9 @@ def _get_db_config() -> dict:
     return {
         "host": os.getenv("DATA_DB_HOST", "postgres"),
         "port": int(os.getenv("DATA_DB_PORT", "5432")),
-        "dbname": os.getenv("DATA_DB_NAME", "salesdb"),
-        "user": os.getenv("DATA_DB_USER", "datauser"),
-        "password": os.getenv("DATA_DB_PASSWORD", "datapassword"),
+        "dbname": os.getenv("DATA_DB_NAME"),
+        "user": os.getenv("DATA_DB_USER"),
+        "password": os.getenv("DATA_DB_PASSWORD"),
     }
 
 

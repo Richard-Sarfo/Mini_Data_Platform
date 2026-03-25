@@ -120,8 +120,8 @@ def upload_to_minio(filepath: str, bucket: str = "sales-data"):
         return
 
     endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-    secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin123")
+    access_key = os.getenv("MINIO_ACCESS_KEY")
+    secret_key = os.getenv("MINIO_SECRET_KEY")
 
     client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=False)
 
