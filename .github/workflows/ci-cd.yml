@@ -197,6 +197,10 @@ jobs:
           METABASE_URL: http://localhost:3000/api/health
 
       - name: Verify records in PostgreSQL
+        env:
+          DB_NAME: salesdb
+          DB_USER: datauser
+          DB_PASSWORD: datapassword
         run: |
           python - <<'EOF'
           import psycopg2, sys, os
