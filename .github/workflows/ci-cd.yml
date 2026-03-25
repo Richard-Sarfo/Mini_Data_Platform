@@ -111,8 +111,12 @@ jobs:
       - name: Start platform services
         run: |
           docker compose up -d postgres minio
-          echo "Waiting for core services..."
-          sleep 20
+          echo "Waiting for PostgreSQL to be healthy..."
+          timeout 120 bash -c 'until docker compose ps postgres | grep -q "healthy"; do echo "Waiting for postgres..."; sleep 5; done'
+          echo "PostgreSQL is healthy!"
+          echo "Waiting for MinIO to be healthy..."
+          timeout 60 bash -c 'until docker compose ps minio | grep -q "healthy"; do echo "Waiting for minio..."; sleep 5; done'
+          echo "MinIO is healthy!"
 
       - name: Initialize MinIO buckets
         run: docker compose run --rm minio-init
@@ -219,9 +223,12 @@ jobs:
       - name: Collect logs on failure
         if: failure()
         run: |
+          echo "=== PostgreSQL logs ==="
+          docker compose logs postgres 2>&1 | tail -100
+          echo "=== Airflow Webserver logs ==="
           docker compose logs airflow-webserver 2>&1 | tail -50
+          echo "=== Airflow Scheduler logs ==="
           docker compose logs airflow-scheduler 2>&1 | tail -50
-          docker compose logs postgres 2>&1 | tail -30
 
       - name: Cleanup
         if: always()
