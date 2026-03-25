@@ -247,21 +247,25 @@ jobs:
           echo "Branch: ${{ github.ref_name }}"
 
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.TEST_SERVER_HOST }}
-          username: ${{ secrets.TEST_SERVER_USER }}
-          key: ${{ secrets.TEST_SERVER_SSH_KEY }}
-          script: |
-            cd /opt/mini-data-platform
-            git pull origin main
-            docker-compose pull
-            docker-compose up -d
-            python scripts/validate_data_flow.py
+        env:
+          TEST_SERVER_HOST: ${{ secrets.TEST_SERVER_HOST }}
+          TEST_SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
+          TEST_SERVER_SSH_KEY: ${{ secrets.TEST_SERVER_SSH_KEY }}
+        run: |
+          if [ -z "$TEST_SERVER_HOST" ] || [ -z "$TEST_SERVER_SSH_KEY" ]; then
+            echo "⚠️ TEST_SERVER_HOST or TEST_SERVER_SSH_KEY not configured — skipping SSH deploy."
+            exit 0
+          fi
+          echo "$TEST_SERVER_SSH_KEY" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+          ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no \
+            "$TEST_SERVER_USER@$TEST_SERVER_HOST" \
+            'cd /opt/mini-data-platform && git pull origin main && docker-compose pull && docker-compose up -d && python scripts/validate_data_flow.py'
+          rm -f /tmp/ssh_key
 
       - name: Deployment complete
         run: |
-          echo "Deployment complete!"
+          echo "✅ Deployment step finished!"
           echo "Services:"
           echo "  - Airflow:  http://${{ secrets.TEST_SERVER_HOST }}:8080"
           echo "  - MinIO:    http://${{ secrets.TEST_SERVER_HOST }}:9001"
