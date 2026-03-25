@@ -86,16 +86,18 @@ jobs:
     env:
       DATA_DB_HOST: localhost
       DATA_DB_PORT: "5432"
-      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-      DATA_DB_NAME: ${{ secrets.DATA_DB_NAME }}
-      DATA_DB_USER: ${{ secrets.DATA_DB_USER }}
-      DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD }}
-      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
-      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
-      AIRFLOW_WWW_USER: ${{ secrets.AIRFLOW_WWW_USER }}
-      AIRFLOW_WWW_PASSWORD: ${{ secrets.AIRFLOW_WWW_PASSWORD }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'airflow' }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'airflow' }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'airflow' }}
+      DATA_DB_NAME: ${{ secrets.DATA_DB_NAME || 'salesdb' }}
+      DATA_DB_USER: ${{ secrets.DATA_DB_USER || 'datauser' }}
+      DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD || 'datapassword' }}
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY || 'minioadmin' }}
+      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY || 'minioadmin123' }}
+      MINIO_ROOT_USER: ${{ secrets.MINIO_ACCESS_KEY || 'minioadmin' }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_SECRET_KEY || 'minioadmin123' }}
+      AIRFLOW_WWW_USER: ${{ secrets.AIRFLOW_WWW_USER || 'admin' }}
+      AIRFLOW_WWW_PASSWORD: ${{ secrets.AIRFLOW_WWW_PASSWORD || 'admin' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -110,13 +112,21 @@ jobs:
 
       - name: Start platform services
         run: |
-          docker compose up -d postgres minio
-          echo "Waiting for PostgreSQL to be healthy..."
-          timeout 120 bash -c 'until docker compose ps postgres | grep -q "healthy"; do echo "Waiting for postgres..."; sleep 5; done'
-          echo "PostgreSQL is healthy!"
-          echo "Waiting for MinIO to be healthy..."
-          timeout 60 bash -c 'until docker compose ps minio | grep -q "healthy"; do echo "Waiting for minio..."; sleep 5; done'
-          echo "MinIO is healthy!"
+          docker compose up -d postgres
+          echo "Waiting for PostgreSQL to be ready..."
+          sleep 10
+          for i in {1..30}; do
+            if docker compose exec -T postgres pg_isready -U ${POSTGRES_USER:-airflow} > /dev/null 2>&1; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Attempt $i/30: Waiting for postgres..."
+            sleep 5
+          done
+          
+          docker compose up -d minio
+          echo "Waiting for MinIO..."
+          sleep 10
 
       - name: Initialize MinIO buckets
         run: docker compose run --rm minio-init
