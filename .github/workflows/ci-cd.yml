@@ -83,6 +83,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name != 'pull_request'
+    env:
+      DATA_DB_HOST: localhost
+      DATA_DB_PORT: "5432"
+      DATA_DB_NAME: ${{ secrets.DATA_DB_NAME }}
+      DATA_DB_USER: ${{ secrets.DATA_DB_USER }}
+      DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD }}
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -134,10 +143,6 @@ jobs:
       - name: Upload sample data to MinIO
         run: |
           python scripts/generate_data.py --rows 50 --files 1 --upload
-        env:
-          MINIO_ENDPOINT: localhost:9000
-          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
-          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
 
       - name: Trigger Airflow DAG
         run: |
@@ -185,30 +190,17 @@ jobs:
       - name: Run Data Flow Validation
         run: python scripts/validate_data_flow.py
         env:
-          DATA_DB_HOST: localhost
-          DATA_DB_PORT: 5432
-          DATA_DB_NAME: ${{ secrets.DB_NAME }}
-          DATA_DB_USER: ${{ secrets.DB_USER }}
-          DATA_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          MINIO_ENDPOINT: localhost:9000
-          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
-          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
           AIRFLOW_URL: http://localhost:8080/health
           METABASE_URL: http://localhost:3000/api/health
 
       - name: Verify records in PostgreSQL
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: ${{ secrets.DATA_DB_NAME }}
-          DB_USER: ${{ secrets.DATA_DB_USER }}
-          DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD }}
         run: |
           python - <<'EOF'
           import psycopg2, sys, os
           conn = psycopg2.connect(
-              host="localhost", port=5432, dbname=os.environ['DB_NAME'],
-              user=os.environ['DB_USER'], password=os.environ['DB_PASSWORD']
+              host=os.environ['DATA_DB_HOST'], port=int(os.environ['DATA_DB_PORT']),
+              dbname=os.environ['DATA_DB_NAME'],
+              user=os.environ['DATA_DB_USER'], password=os.environ['DATA_DB_PASSWORD']
           )
           with conn.cursor() as cur:
               cur.execute("SELECT COUNT(*) FROM sales_transactions")
