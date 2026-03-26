@@ -150,7 +150,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install validation dependencies
-        run: pip install minio psycopg2-binary pandas
+        run: pip install minio psycopg2-binary pandas python-dotenv
 
       - name: Generate sample data
         run: |

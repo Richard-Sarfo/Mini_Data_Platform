@@ -20,10 +20,15 @@ import urllib.error
 import urllib.request
 
 import psycopg2
-from dotenv import load_dotenv
-from minio import Minio
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not available, use environment variables directly
+    pass
+
+from minio import Minio
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
