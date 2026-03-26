@@ -86,20 +86,20 @@ jobs:
     env:
       DATA_DB_HOST: localhost
       DATA_DB_PORT: "5432"
-      POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'airflow' }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'airflow' }}
-      POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'airflow' }}
-      DATA_DB_NAME: ${{ secrets.DATA_DB_NAME || 'salesdb' }}
-      DATA_DB_USER: ${{ secrets.DATA_DB_USER || 'datauser' }}
-      DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD || 'datapassword' }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      DATA_DB_NAME: ${{ secrets.DATA_DB_NAME }}
+      DATA_DB_USER: ${{ secrets.DATA_DB_USER }}
+      DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD }}
       MINIO_ENDPOINT: localhost:9000
-      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY || 'minioadmin' }}
-      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY || 'minioadmin123' }}
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
       MINIO_BUCKET: sales-data
-      MINIO_ROOT_USER: ${{ secrets.MINIO_ACCESS_KEY || 'minioadmin' }}
-      MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_SECRET_KEY || 'minioadmin123' }}
-      AIRFLOW_WWW_USER: ${{ secrets.AIRFLOW_WWW_USER || 'admin' }}
-      AIRFLOW_WWW_PASSWORD: ${{ secrets.AIRFLOW_WWW_PASSWORD || 'admin' }}
+      MINIO_ROOT_USER: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_SECRET_KEY }}
+      AIRFLOW_WWW_USER: ${{ secrets.AIRFLOW_WWW_USER }}
+      AIRFLOW_WWW_PASSWORD: ${{ secrets.AIRFLOW_WWW_PASSWORD }}
       AIRFLOW_URL: http://localhost:8080/health
       METABASE_URL: http://localhost:3000/api/health
 
