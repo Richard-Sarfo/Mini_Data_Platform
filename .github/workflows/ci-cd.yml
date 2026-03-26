@@ -92,12 +92,16 @@ jobs:
       DATA_DB_NAME: ${{ secrets.DATA_DB_NAME || 'salesdb' }}
       DATA_DB_USER: ${{ secrets.DATA_DB_USER || 'datauser' }}
       DATA_DB_PASSWORD: ${{ secrets.DATA_DB_PASSWORD || 'datapassword' }}
+      MINIO_ENDPOINT: localhost:9000
       MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY || 'minioadmin' }}
       MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY || 'minioadmin123' }}
+      MINIO_BUCKET: sales-data
       MINIO_ROOT_USER: ${{ secrets.MINIO_ACCESS_KEY || 'minioadmin' }}
       MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_SECRET_KEY || 'minioadmin123' }}
       AIRFLOW_WWW_USER: ${{ secrets.AIRFLOW_WWW_USER || 'admin' }}
       AIRFLOW_WWW_PASSWORD: ${{ secrets.AIRFLOW_WWW_PASSWORD || 'admin' }}
+      AIRFLOW_URL: http://localhost:8080/health
+      METABASE_URL: http://localhost:3000/api/health
 
     steps:
       - uses: actions/checkout@v4
@@ -210,9 +214,6 @@ jobs:
 
       - name: Run Data Flow Validation
         run: python scripts/validate_data_flow.py
-        env:
-          AIRFLOW_URL: http://localhost:8080/health
-          METABASE_URL: http://localhost:3000/api/health
 
       - name: Verify records in PostgreSQL
         continue-on-error: true
